@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart'; // Add this import
 import 'package:path/path.dart'; // Add this import for file paths
+import 'package:file_picker/file_picker.dart';
 
 void main() {
   runApp(MyApp());
@@ -50,23 +51,30 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  Future<void> _saveImage() async {
+
+Future<void> _saveImage() async {
   if (_image != null) {
     try {
-      // Get the directory to store the image
-      final directory = await getApplicationDocumentsDirectory();
-      final path = join(directory.path, '${DateTime.now().millisecondsSinceEpoch}.png');
-      
-      // Copy the file to the new path
-      await _image!.copy(path);
-      
-      // Optionally, you can notify the user or handle the saved file
-      print('Image saved to $path');
+      // Open a dialog box to select the save path
+      String? path = await FilePicker.platform.getDirectoryPath();
+
+      if (path != null) {
+        final fileName = '${DateTime.now().millisecondsSinceEpoch}.png';
+        final savePath = '$path/$fileName';
+
+        // Copy the image file to the selected path
+        await _image!.copy(savePath);
+        print('Image saved to $savePath');
+      } else {
+        print('No path selected.');
+      }
     } catch (e) {
       print('Error saving image: $e');
     }
   }
 }
+
+
 
   @override
   Widget build(BuildContext context) {
