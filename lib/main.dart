@@ -1,59 +1,47 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart'; // Add this import
+import 'package:path/path.dart'; // Add this import for file paths
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final cameras = await availableCameras();
-  final firstCamera = cameras.first;
-
-  runApp(MyApp(camera: firstCamera));
+void main() {
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final CameraDescription camera;
-
-  const MyApp({Key? key, required this.camera}) : super(key: key);
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Camera Demo',
+      title: 'Flutter Image Picker Demo',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: MyHomePage(camera: camera),
+      home: MyHomePage(),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  final CameraDescription camera;
-
-  const MyHomePage({Key? key, required this.camera}) : super(key: key);
-
   @override
   _MyHomePageState createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  late CameraController _controller;
-  late Future<void> _initializeControllerFuture;
-  double _brightness = 0.5;
+  File? _image;
+  double _brightness = 0.0;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = CameraController(
-      widget.camera,
-      ResolutionPreset.high,
-    );
-    _initializeControllerFuture = _controller.initialize();
-  }
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.camera);
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+    setState(() {
+      if (pickedFile != null) {
+        _image = File(pickedFile.path);
+      } else {
+        print('No image selected.');
+      }
+    });
   }
 
   void _adjustBrightness(double value) {
@@ -62,53 +50,68 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  Future<void> _saveImage() async {
+  if (_image != null) {
+    try {
+      // Get the directory to store the image
+      final directory = await getApplicationDocumentsDirectory();
+      final path = join(directory.path, '${DateTime.now().millisecondsSinceEpoch}.png');
+      
+      // Copy the file to the new path
+      await _image!.copy(path);
+      
+      // Optionally, you can notify the user or handle the saved file
+      print('Image saved to $path');
+    } catch (e) {
+      print('Error saving image: $e');
+    }
+  }
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Flutter Camera Demo'),
+        title: Text('Flutter Image Picker Demo'),
       ),
       body: Column(
         children: [
           Expanded(
-            child: FutureBuilder<void>(
-              future: _initializeControllerFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done) {
-                  return ColorFiltered(
-                    colorFilter: ColorFilter.mode(
-                      Colors.black.withOpacity(1 - _brightness),
-                      BlendMode.dstATop,
+            child: Center(
+              child: _image == null
+                  ? Text('No image selected.')
+                  : ColorFiltered(
+                      colorFilter: ColorFilter.matrix(<double>[
+                        1, 0, 0, 0, _brightness * 255,
+                        0, 1, 0, 0, _brightness * 255,
+                        0, 0, 1, 0, _brightness * 255,
+                        0, 0, 0, 1, 0,
+                      ]),
+                      child: Image.file(_image!),
                     ),
-                    child: CameraPreview(_controller),
-                  );
-                } else {
-                  return Center(child: CircularProgressIndicator());
-                }
-              },
             ),
           ),
           Slider(
             value: _brightness,
-            min: 0.0,
+            min: -1.0,
             max: 1.0,
             onChanged: _adjustBrightness,
             label: 'Brightness',
           ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton(
+                onPressed: _pickImage,
+                child: Text('Take Picture'),
+              ),
+              ElevatedButton(
+                onPressed: _saveImage,
+                child: Text('Save Picture'),
+              ),
+            ],
+          ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          try {
-            await _initializeControllerFuture;
-            final image = await _controller.takePicture();
-            print('Picture taken: ${image.path}');
-          } catch (e) {
-            print(e);
-          }
-        },
-        tooltip: 'Take Picture',
-        child: Icon(Icons.camera),
       ),
     );
   }
